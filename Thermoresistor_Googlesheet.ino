@@ -1,4 +1,4 @@
-#define GOOGLE_SCRIPT_URL "https://script.google.com/macros/s/AKfycbxdUQDHCi-8Zr6PloQWfd4IBUyP6XoEnd3iBafrNuwhBfUoNd1R9B5Ouc3qW8RMZsYr/exec"
+#define GOOGLE_SCRIPT_URL "https://script.google.com/macros/s/<SECRET_CODE_ACCESS>/exec"
 
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
@@ -36,29 +36,29 @@ unsigned long lastSendTime = 0;
 
 float t0, t1, t2; 
 
+const byte MOVING_AVERAGE_WINDOW = 4;
+
 float movingAverage(int sensor, float value) {
-  const byte nvalues = 4;             // Moving average window size
-
-  static byte current[3] = {0,0,0};            // Index for current value
-  static byte cvalues[3] = {0,0,0};            // Count of values read (<= nvalues)
-  static float sum[3] = {0,0,0};               // Rolling sum
-  static float values[3][nvalues];
-
-  sum[sensor] += value;
-
-  // If the window is full, adjust the sum by deleting the oldest value
-  if (cvalues[sensor] == nvalues)
-    sum[sensor] -= values[sensor][current[sensor]];
-
-  values[sensor][current[sensor]] = value;          // Replace the oldest with the latest
-
-  if (++current[sensor] >= nvalues)
-    current[sensor] = 0;
-
-  if (cvalues[sensor] < nvalues)
-    cvalues[sensor] += 1;
-
-  return sum[sensor]/cvalues[sensor];
+    static float history[3][MOVING_AVERAGE_WINDOW] = {{0}};
+    static byte indices[3] = {0};
+    static float sums[3] = {0};
+    static byte counts[3] = {0};
+    
+    // Remove oldest value from sum if window is full
+    if (counts[sensor] == MOVING_AVERAGE_WINDOW) {
+        sums[sensor] -= history[sensor][indices[sensor]];
+    } else {
+        counts[sensor]++;
+    }
+    
+    // Add new value
+    history[sensor][indices[sensor]] = value;
+    sums[sensor] += value;
+    
+    // Update index
+    indices[sensor] = (indices[sensor] + 1) % MOVING_AVERAGE_WINDOW;
+    
+    return sums[sensor] / counts[sensor];
 }
 
 void readThermistorData()
